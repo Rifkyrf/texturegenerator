@@ -1,0 +1,6 @@
+{
+  "name": "Minecraft Texture Dye Generator & Recolor Studio",
+  "description": "Aplikasi web dinamis untuk recolor tekstur Minecraft ke 16 warna dye atau custom palette dengan eyedropper interaktif dan ekspor batch ZIP.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
