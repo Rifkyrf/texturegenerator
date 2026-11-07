@@ -1,5 +1,5 @@
-import { DyeColor, GeneratedVariant, RecolorSettings, TextureFile } from '../types';
-import { getPerceivedLuminance } from './colorUtils';
+import { DyeColor, GeneratedVariant, RecolorSettings, TextureFile, ExtractedColor } from '../types';
+import { getPerceivedLuminance, rgbToHex } from './colorUtils';
 
 /**
  * Check if a pixel matches the source color within tolerance
@@ -228,4 +228,44 @@ export async function generateAllVariants(
   }
 
   return variants;
+}
+
+/**
+ * Extract all unique colors present in the texture, sorted by pixel frequency
+ */
+export function extractTextureColors(imageData: ImageData): ExtractedColor[] {
+  const data = imageData.data;
+  const colorMap = new Map<string, { rgb: [number, number, number]; count: number }>();
+  let visiblePixels = 0;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a < 10) continue; // Skip near-transparent
+    visiblePixels++;
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const hex = rgbToHex(r, g, b);
+
+    const existing = colorMap.get(hex);
+    if (existing) {
+      existing.count++;
+    } else {
+      colorMap.set(hex, { rgb: [r, g, b], count: 1 });
+    }
+  }
+
+  const results: ExtractedColor[] = [];
+  const denominator = Math.max(1, visiblePixels);
+
+  colorMap.forEach((val, hex) => {
+    results.push({
+      hex,
+      rgb: val.rgb,
+      count: val.count,
+      percentage: Math.round((val.count / denominator) * 100),
+    });
+  });
+
+  return results.sort((a, b) => b.count - a.count);
 }

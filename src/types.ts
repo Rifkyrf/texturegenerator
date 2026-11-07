@@ -48,3 +48,10 @@ export interface SampleTexture {
   tolerance: number;
   mode: RecolorMode;
 }
+
+export interface ExtractedColor {
+  hex: string;
+  rgb: [number, number, number];
+  count: number;
+  percentage: number;
+}

@@ -22,8 +22,33 @@ import {
   generateAllVariants,
   getImageDataFromElement,
 } from './utils/recolorEngine';
+import { Image as ImageIcon, Sliders, FolderArchive } from 'lucide-react';
 
 export default function App() {
+  // Theme state: dark or light
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mc_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark';
+  });
+
+  // Apply theme class to <html> element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('mc_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Default sample texture: Wool Block
   const defaultSample = SAMPLE_TEXTURES[0];
 
@@ -47,22 +72,25 @@ export default function App() {
     preserveAlpha: true,
   });
 
-  // Default colors list: 15 dye colors enabled (white disabled by default to match Python script)
+  // Default colors: 15 dye colors enabled (matching Python script default)
   const [colors, setColors] = useState<DyeColor[]>(() =>
     DEFAULT_MINECRAFT_DYES.map((c) => ({
       ...c,
-      enabled: c.id !== 'white', // 15 colors as in the user's Python script
+      enabled: c.id !== 'white',
     }))
   );
 
   // Generated variants state
   const [variants, setVariants] = useState<GeneratedVariant[]>([]);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   // Active modals
   const [active3DVariant, setActive3DVariant] = useState<GeneratedVariant | null>(null);
   const [activeCompareVariant, setActiveCompareVariant] = useState<GeneratedVariant | null>(null);
 
+  // Section refs for smooth mobile scrolling
+  const sectionPickerRef = useRef<HTMLDivElement | null>(null);
+  const sectionPaletteRef = useRef<HTMLDivElement | null>(null);
+  const sectionResultsRef = useRef<HTMLDivElement | null>(null);
 
   // Load ImageData whenever currentTexture dataUrl changes
   useEffect(() => {
@@ -80,7 +108,6 @@ export default function App() {
   // Compute all variants whenever sourceImageData, colors, or settings change
   const computeVariants = useCallback(async () => {
     if (!sourceImageData || !currentTexture) return;
-    setIsProcessing(true);
 
     try {
       const result = await generateAllVariants(
@@ -92,8 +119,6 @@ export default function App() {
       setVariants(result);
     } catch (err) {
       console.error('Error generating variants', err);
-    } finally {
-      setIsProcessing(false);
     }
   }, [sourceImageData, currentTexture, colors, settings]);
 
@@ -134,7 +159,7 @@ export default function App() {
     }));
   };
 
-  // Handler when user picks color via eyedropper canvas
+  // Handler when user picks color via eyedropper canvas or mobile palette
   const handleEyedropperSelect = (hex: string, rgb: [number, number, number]) => {
     setSettings((prev) => ({
       ...prev,
@@ -156,43 +181,83 @@ export default function App() {
     );
   };
 
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
-      <Header />
+    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col transition-colors">
+      <Header theme={theme} onToggleTheme={toggleTheme} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+      {/* Mobile Quick Jump Bar (Floating / sticky for easy phone navigation) */}
+      <div className="sm:hidden sticky top-[53px] z-30 bg-white/95 dark:bg-zinc-900/95 border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 flex items-center justify-between gap-1 shadow-sm backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => scrollToSection(sectionPickerRef)}
+          className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center gap-1"
+        >
+          <ImageIcon className="w-3 h-3 text-emerald-500" />
+          <span>Tekstur</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => scrollToSection(sectionPaletteRef)}
+          className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center gap-1"
+        >
+          <Sliders className="w-3 h-3 text-amber-500" />
+          <span>Warna</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => scrollToSection(sectionResultsRef)}
+          className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-emerald-600 text-white flex items-center justify-center gap-1 shadow-sm"
+        >
+          <FolderArchive className="w-3 h-3" />
+          <span>Hasil ({variants.length})</span>
+        </button>
+      </div>
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col gap-5 sm:gap-6">
         {/* Step 1: Upload or Choose Sample Texture */}
-        <TextureUploader
-          currentTexture={currentTexture}
-          onTextureLoaded={handleTextureLoaded}
-          onSelectSample={handleSelectSample}
-          activeSampleId={activeSampleId}
-        />
+        <div>
+          <TextureUploader
+            currentTexture={currentTexture}
+            onTextureLoaded={handleTextureLoaded}
+            onSelectSample={handleSelectSample}
+            activeSampleId={activeSampleId}
+          />
+        </div>
 
-        {/* Step 2: Interactive Eyedropper & Pixel Inspector */}
-        <InteractiveCanvasPicker
-          sourceTexture={currentTexture}
-          sourceImageData={sourceImageData}
-          settings={settings}
-          onSelectColor={handleEyedropperSelect}
-        />
+        {/* Step 2: Interactive Eyedropper & Pixel Inspector + 1-Tap Mobile Palette */}
+        <div ref={sectionPickerRef} className="scroll-mt-24 sm:scroll-mt-20">
+          <InteractiveCanvasPicker
+            sourceTexture={currentTexture}
+            sourceImageData={sourceImageData}
+            settings={settings}
+            onSelectColor={handleEyedropperSelect}
+          />
+        </div>
 
         {/* Step 3: Color Palette Manager (Source Color & 15/16 Dyes + Custom Colors) */}
-        <ColorPaletteManager
-          settings={settings}
-          onUpdateSettings={handleUpdateSettings}
-          colors={colors}
-          onUpdateColors={setColors}
-          onResetColors={handleResetColors}
-        />
+        <div ref={sectionPaletteRef} className="scroll-mt-24 sm:scroll-mt-20">
+          <ColorPaletteManager
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            colors={colors}
+            onUpdateColors={setColors}
+            onResetColors={handleResetColors}
+          />
+        </div>
 
         {/* Step 4: Real-time Generated Texture Variants & Batch Download ZIP */}
-        <TextureVariantsGrid
-          variants={variants}
-          sourceTexture={currentTexture}
-          onOpen3DModal={(variant) => setActive3DVariant(variant)}
-          onOpenCompareModal={(variant) => setActiveCompareVariant(variant)}
-        />
+        <div ref={sectionResultsRef} className="scroll-mt-24 sm:scroll-mt-20">
+          <TextureVariantsGrid
+            variants={variants}
+            sourceTexture={currentTexture}
+            onOpen3DModal={(variant) => setActive3DVariant(variant)}
+            onOpenCompareModal={(variant) => setActiveCompareVariant(variant)}
+          />
+        </div>
       </main>
 
       {/* 3D Minecraft Block Preview Modal */}
@@ -208,16 +273,16 @@ export default function App() {
         onClose={() => setActiveCompareVariant(null)}
       />
 
-      {/* Clean Footer */}
-      <footer className="border-t border-zinc-800/80 bg-zinc-950 py-6 mt-12 text-center text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Footer */}
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 py-5 mt-10 text-center text-xs text-zinc-500 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <p>
-            Minecraft Texture Dye Recolor Studio • Dibuat untuk Modder & Resource Pack Creators
+            Minecraft Texture Dye Recolor Studio • Siap Hosting di Vercel
           </p>
-          <div className="flex items-center gap-4 text-zinc-400">
-            <span>Client-Side Processing (0 Server Lag)</span>
+          <div className="flex items-center gap-3 text-zinc-500 dark:text-zinc-400">
+            <span>Mobile Friendly</span>
             <span>•</span>
-            <span>Vercel / SPA Compatible</span>
+            <span>100% Client-Side Processing</span>
           </div>
         </div>
       </footer>

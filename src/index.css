@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  :root:not(.dark) {
+    color-scheme: light;
+  }
+}
+
 @layer utilities {
   .pixelated {
     image-rendering: pixelated;
